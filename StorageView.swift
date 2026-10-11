@@ -1,64 +1,56 @@
 import SwiftUI
 
 struct StorageView: View {
-    @State private var totalStorage: String = "Loading..."
-    @State private var usedStorage: String = "Loading..."
-    @State private var freeStorage: String = "Loading..."
-    @State private var usedPercentage: Double = 0.0
-
+    @State private var total = "Loading..."
+    @State private var used = "Loading..."
+    @State private var free = "Loading..."
+    @State private var percentage = 0.0
     let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
-                VStack(alignment: .leading) {
-                    Text("Storage Usage")
-                        .font(.headline)
-
-                    ProgressView(value: usedPercentage)
-                        .progressViewStyle(LinearProgressViewStyle(tint: .blue))
-                        .padding(.vertical, 5)
+                Section {
+                    GlassCard {
+                        Text("Storage Usage").font(.headline)
+                        CapacityBar(usedFraction: percentage, tint: .blue)
+                        HStack {
+                            Text("\(Int(percentage * 100))% used")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(total)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 }
 
-                infoRow(label: "Used Storage", value: usedStorage)
-                infoRow(label: "Free Storage", value: freeStorage)
-                infoRow(label: "Total Storage", value: totalStorage)
-
-                Text("Values are estimated and automatically updated every 2 seconds.")
-                    .font(.footnote)
-                    .foregroundColor(.gray)
-                    .padding(.top, 8)
+                Section("Storage") {
+                    InfoRow(label: "Used Storage", value: used, icon: "chart.pie.fill", iconColor: .blue)
+                    InfoRow(label: "Free Storage", value: free, icon: "internaldrive", iconColor: .green)
+                    InfoRow(label: "Total Storage", value: total, icon: "internaldrive.fill", iconColor: .gray)
+                }
             }
             .navigationTitle("Storage")
-            .onAppear {
-                updateStorageInfo()
-            }
-            .onReceive(timer) { _ in
-                updateStorageInfo()
-            }
+            .navigationBarTitleDisplayMode(.large)
+            .onAppear { updateStorage() }
+            .onReceive(timer) { _ in updateStorage() }
         }
     }
 
-    func updateStorageInfo() {
-        if let attributes = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()),
-           let totalSpace = attributes[.systemSize] as? NSNumber,
-           let freeSpace = attributes[.systemFreeSize] as? NSNumber {
-
-            let total = Double(truncating: totalSpace) / (1024 * 1024 * 1024)
-            let free = Double(truncating: freeSpace) / (1024 * 1024 * 1024)
-            let used = total - free
-            let percentUsed = used / total
-
-            totalStorage = String(format: "%.2f GB", total)
-            freeStorage = String(format: "%.2f GB", free)
-            usedStorage = String(format: "%.2f GB", used)
-            usedPercentage = percentUsed
-        } else {
-            totalStorage = "Error"
-            freeStorage = "Error"
-            usedStorage = "Error"
-            usedPercentage = 0.0
-        }
+    private func updateStorage() {
+        guard let attributes = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()),
+              let totalSpace = attributes[.systemSize] as? NSNumber,
+              let freeSpace = attributes[.systemFreeSize] as? NSNumber else { return }
+        let t = Double(truncating: totalSpace) / 1073741824
+        let f = Double(truncating: freeSpace) / 1073741824
+        let u = t - f
+        total = String(format: "%.2f GB", t)
+        free = String(format: "%.2f GB", f)
+        used = String(format: "%.2f GB", u)
+        percentage = u / t
     }
 }
-

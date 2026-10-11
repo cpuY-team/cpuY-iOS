@@ -1,84 +1,75 @@
 import SwiftUI
 
 struct BatteryView: View {
-    @State private var batteryLevelText = ""
-    @State private var batteryStatusText = ""
-    @State private var batteryUsageText = ""
-
+    @State private var level: Float = 0
+    @State private var status = "Unknown"
     let timer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
-    init() {
-        UIDevice.current.isBatteryMonitoringEnabled = true
-    }
+    init() { UIDevice.current.isBatteryMonitoringEnabled = true }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
-                infoRow(label: "Battery Level", value: batteryLevelText)
-                infoRow(label: "Battery Status", value: batteryStatusText)
-                infoRow(label: "Estimated Usage Time", value: batteryUsageText)
+                Section {
+                    GlassCard {
+                        HStack {
+                            Spacer()
+                            RingGauge(
+                                value: Double(max(level, 0)),
+                                label: status,
+                                valueText: level < 0 ? "—" : "\(Int(level * 100))%",
+                                tint: tint
+                            )
+                            Spacer()
+                        }
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
 
-                Text("Note: Since iOS 17, apps no longer have access to the exact battery level. It is rounded to 5% increments.")
-                    .font(.footnote)
-                    .foregroundColor(.gray)
-                    .padding(.top, 8)
+                Section {
+                    InfoRow(label: "Battery Level", value: levelText, icon: "battery.100", iconColor: tint)
+                    InfoRow(label: "Battery Status", value: status, icon: statusIcon, iconColor: tint)
+                } header: {
+                    Text("Battery")
+                } footer: {
+                    Text("Note: since iOS 17, apps can no longer read the exact battery percentage — only an approximate value rounded to the nearest 5%, refreshed every 2 seconds.")
+                }
             }
             .navigationTitle("Battery")
-            .onAppear {
-                updateBatteryInfo()
-            }
-            .onReceive(timer) { _ in
-                updateBatteryInfo()
-            }
+            .navigationBarTitleDisplayMode(.large)
+            .onAppear { refresh() }
+            .onReceive(timer) { _ in refresh() }
         }
     }
 
-    func updateBatteryInfo() {
-        batteryLevelText = batteryLevel()
-        batteryStatusText = batteryStatus()
-        batteryUsageText = usageTime()
+    private var levelText: String {
+        level < 0 ? "Unavailable" : "\(Int(level * 100))%"
     }
 
-    func batteryLevel() -> String {
-        let level = UIDevice.current.batteryLevel
-        if level < 0 {
-            return "Unavailable"
-        } else {
-            let percent = Int(level * 100)
-            return "\(percent)%"
-        }
-    }
-
-    func batteryStatus() -> String {
+    private var statusIcon: String {
         switch UIDevice.current.batteryState {
-        case .unknown:
-            return "Unknown"
-        case .unplugged:
-            return "On Battery"
-        case .charging:
-            return "Charging"
-        case .full:
-            return "Fully Charged"
-        @unknown default:
-            return "Unknown"
+        case .charging: return "bolt.fill"
+        case .full: return "battery.100.bolt"
+        case .unplugged: return "battery.50"
+        default: return "battery.0"
         }
     }
 
-    func usageTime() -> String {
-        let batteryLevel = UIDevice.current.batteryLevel
-        if batteryLevel < 0 {
-            return "Unavailable"
+    private var tint: Color {
+        switch UIDevice.current.batteryState {
+        case .charging, .full: return .green
+        default: return level >= 0 && level < 0.2 ? .red : .green
         }
+    }
 
-        let batteryPercentage = batteryLevel * 100
-        let fullUsageInMinutes = 8 * 60
-        let remainingMinutes = Int((batteryPercentage / 100) * Float(fullUsageInMinutes))
-
-        let hours = remainingMinutes / 60
-        let minutes = remainingMinutes % 60
-
-        return "\(hours)h \(minutes)m estimated remaining"
+    private func refresh() {
+        level = UIDevice.current.batteryLevel
+        switch UIDevice.current.batteryState {
+        case .charging: status = "Charging"
+        case .full: status = "Full"
+        case .unplugged: status = "Unplugged"
+        default: status = "Unknown"
+        }
     }
 }
-
-
